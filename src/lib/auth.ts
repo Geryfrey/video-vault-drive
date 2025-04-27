@@ -1,90 +1,78 @@
 
+// This file is kept for compatibility with existing code
+// In a real app with Supabase, we're using the Supabase client directly
+// for authentication in the AuthContext
+
 import { User } from "@/types";
-
-// Mock authentication functions
-// In a real app, this would connect to a backend API
-
-const STORAGE_KEY = 'video_vault_auth';
-
-// Mock user data
-const mockUsers: User[] = [
-  {
-    id: '1',
-    email: 'admin@example.com',
-    name: 'Admin User',
-    role: 'admin',
-    avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
-  },
-  {
-    id: '2',
-    email: 'user@example.com',
-    name: 'Regular User',
-    role: 'user',
-    avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User'
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
 
 export async function loginUser(email: string, password: string): Promise<User> {
-  // Simulating network request
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   
-  const user = mockUsers.find(user => user.email === email);
-  
-  if (!user) {
-    throw new Error('Invalid email or password');
+  if (error) {
+    throw new Error(error.message);
   }
   
-  // In a real app, we would check the password hash here
-  if (password.length < 6) {
-    throw new Error('Invalid email or password');
+  if (!data.user) {
+    throw new Error('User not found');
   }
   
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  // Fetch the profile from our custom table
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
   
-  return user;
+  if (profileError || !profile) {
+    throw new Error('Profile not found');
+  }
+  
+  return {
+    id: data.user.id,
+    email: data.user.email || '',
+    name: profile.name || '',
+    role: profile.role as "user" | "admin",
+    avatarUrl: profile.avatar_url,
+  };
 }
 
 export async function registerUser(email: string, password: string, name: string): Promise<User> {
-  // Simulating network request
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  if (mockUsers.some(user => user.email === email)) {
-    throw new Error('User with this email already exists');
-  }
-  
-  if (password.length < 6) {
-    throw new Error('Password must be at least 6 characters');
-  }
-  
-  // Create new user
-  const newUser: User = {
-    id: String(mockUsers.length + 1),
+  const { data, error } = await supabase.auth.signUp({
     email,
-    name,
+    password,
+    options: {
+      data: {
+        name
+      }
+    }
+  });
+  
+  if (error) {
+    throw new Error(error.message);
+  }
+  
+  if (!data.user) {
+    throw new Error('Registration failed');
+  }
+  
+  return {
+    id: data.user.id,
+    email: data.user.email || '',
+    name: name,
     role: 'user',
-    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
+    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.id}`
   };
-  
-  // In a real app, we would add this user to the database
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-  
-  return newUser;
 }
 
 export function getCurrentUser(): User | null {
-  const userJson = localStorage.getItem(STORAGE_KEY);
-  if (!userJson) return null;
-  
-  try {
-    return JSON.parse(userJson) as User;
-  } catch (e) {
-    console.error('Failed to parse user data', e);
-    return null;
+  const session = supabase.auth.getSession();
+  return null; // Just for compatibility, we use the context directly now
+}
+
+export async function logoutUser(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    throw new Error(error.message);
   }
 }
-
-export function logoutUser(): void {
-  localStorage.removeItem(STORAGE_KEY);
-}
-

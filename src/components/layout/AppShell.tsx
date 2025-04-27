@@ -1,7 +1,7 @@
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -15,6 +15,7 @@ interface AppShellProps {
 export function AppShell({ children, requireAuth = false, adminOnly = false }: AppShellProps) {
   const { user, loading } = useAuth();
   const isMobile = useIsMobile();
+  const location = useLocation();
 
   // Show loading state
   if (loading) {
@@ -27,7 +28,7 @@ export function AppShell({ children, requireAuth = false, adminOnly = false }: A
 
   // Check authentication if required
   if (requireAuth && !user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 
   // Check admin access if required
