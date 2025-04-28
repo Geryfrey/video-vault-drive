@@ -97,7 +97,7 @@ export async function uploadVideo(
     if (dbError) throw dbError;
     
     // Generate thumbnail using the first frame
-    await generateThumbnail(video.id, driveUrl);
+    await generateThumbnail(video.id);
     
     // Generate subtitles if requested
     if (options.generateSubtitles) {
@@ -187,7 +187,7 @@ function transformDatabaseVideo(dbVideo: any): Video {
 }
 
 // Helper function to generate a thumbnail for a video
-async function generateThumbnail(videoId: string, videoUrl: string): Promise<void> {
+async function generateThumbnail(videoId: string): Promise<void> {
   try {
     // For now, just use a placeholder thumbnail
     // In a real app, this would generate actual thumbnails from the video
