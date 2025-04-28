@@ -69,9 +69,9 @@ export function VideoUploader() {
       const newVideo = await uploadVideo(file, title, processingOptions, user);
       toast.success('Video uploaded successfully');
       navigate(`/videos/${newVideo.id}`);
-    } catch (error) {
-      toast.error('Failed to upload video');
-      console.error(error);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload video');
+      console.error('Upload error:', error);
     } finally {
       setIsUploading(false);
     }

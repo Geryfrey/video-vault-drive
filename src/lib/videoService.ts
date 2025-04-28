@@ -1,106 +1,52 @@
 
 import { Video, ProcessingOptions, ProcessingStatus, User } from "@/types";
-
-// Mock video data
-const mockVideos: Video[] = [
-  {
-    id: '1',
-    title: 'Introduction Video',
-    status: 'completed',
-    originalFormat: 'mp4',
-    targetFormat: 'mp4',
-    targetResolution: '720p',
-    createdAt: '2025-03-15T10:30:00Z',
-    completedAt: '2025-03-15T11:00:00Z',
-    size: 15728640, // 15MB
-    duration: 180, // 3 minutes
-    thumbnailUrl: 'https://images.unsplash.com/photo-1518155317743-a8ff43ea6a5f?auto=format&fit=crop&w=500&h=280',
-    driveUrl: 'https://drive.google.com/uc?export=download&id=abc123',
-    ownerId: '2',
-    subtitlesUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-    thumbnails: [
-      'https://images.unsplash.com/photo-1518155317743-a8ff43ea6a5f?auto=format&fit=crop&w=500&h=280',
-      'https://images.unsplash.com/photo-1497015289639-54688650d173?auto=format&fit=crop&w=500&h=280',
-      'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=500&h=280'
-    ]
-  },
-  {
-    id: '2',
-    title: 'Project Demo',
-    status: 'processing',
-    originalFormat: 'mov',
-    targetFormat: 'mp4',
-    targetResolution: '1080p',
-    createdAt: '2025-04-20T14:15:00Z',
-    size: 104857600, // 100MB
-    duration: 600, // 10 minutes
-    thumbnailUrl: 'https://images.unsplash.com/photo-1497015289639-54688650d173?auto=format&fit=crop&w=500&h=280',
-    ownerId: '2'
-  },
-  {
-    id: '3',
-    title: 'Company Presentation',
-    status: 'pending',
-    originalFormat: 'webm',
-    targetFormat: 'mp4',
-    targetResolution: '1080p',
-    createdAt: '2025-04-25T09:45:00Z',
-    size: 52428800, // 50MB
-    duration: 900, // 15 minutes
-    thumbnailUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=500&h=280',
-    ownerId: '1'
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // Get all videos (admins can see all, users only see their own)
 export async function getAllVideos(currentUser: User): Promise<Video[]> {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
-  if (currentUser.role === 'admin') {
-    return [...mockVideos];
-  } else {
-    return mockVideos.filter(video => video.ownerId === currentUser.id);
+  try {
+    let query = supabase
+      .from('videos')
+      .select('*');
+    
+    if (currentUser.role !== 'admin') {
+      query = query.eq('user_id', currentUser.id);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    return data.map(transformDatabaseVideo);
+  } catch (error) {
+    console.error('Error fetching videos:', error);
+    throw error;
   }
 }
 
 // Get a single video by ID
 export async function getVideoById(id: string, currentUser: User): Promise<Video | null> {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  const video = mockVideos.find(v => v.id === id);
-  
-  if (!video) return null;
-  
-  // Check if user has access to this video
-  if (currentUser.role !== 'admin' && video.ownerId !== currentUser.id) {
-    return null;
+  try {
+    const { data, error } = await supabase
+      .from('videos')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    if (!data) return null;
+    
+    // Check if user has access to this video
+    if (currentUser.role !== 'admin' && data.user_id !== currentUser.id) {
+      return null;
+    }
+    
+    return transformDatabaseVideo(data);
+  } catch (error) {
+    console.error('Error fetching video:', error);
+    throw error;
   }
-  
-  return { ...video };
-}
-
-// Generate random thumbnails
-function generateThumbnails(): string[] {
-  // Generate 3-5 thumbnails
-  const count = Math.floor(Math.random() * 3) + 3;
-  const thumbnails = [];
-  
-  // Sample image URLs
-  const sampleImages = [
-    'https://images.unsplash.com/photo-1518155317743-a8ff43ea6a5f?auto=format&fit=crop&w=500&h=280',
-    'https://images.unsplash.com/photo-1497015289639-54688650d173?auto=format&fit=crop&w=500&h=280',
-    'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=500&h=280',
-    'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=500&h=280',
-    'https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=500&h=280'
-  ];
-  
-  for (let i = 0; i < count; i++) {
-    thumbnails.push(sampleImages[Math.floor(Math.random() * sampleImages.length)]);
-  }
-  
-  return thumbnails;
 }
 
 // Upload and process a new video
@@ -110,100 +56,155 @@ export async function uploadVideo(
   options: ProcessingOptions,
   currentUser: User
 ): Promise<Video> {
-  // Simulate upload and processing delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Generate a random thumbnail
-  const randomSeed = Math.floor(Math.random() * 1000);
-  const thumbnailUrl = `https://picsum.photos/seed/${randomSeed}/500/280`;
-  
-  const newVideo: Video = {
-    id: `vid_${Date.now().toString()}`,
-    title,
-    status: 'pending',
-    originalFormat: file.name.split('.').pop() as any || 'mp4',
-    targetFormat: options.targetFormat,
-    targetResolution: options.targetResolution,
-    createdAt: new Date().toISOString(),
-    size: file.size,
-    duration: Math.floor(Math.random() * 600) + 60, // Random duration between 1-10 minutes
-    thumbnailUrl,
-    ownerId: currentUser.id
-  };
-  
-  // Add to mock videos array
-  mockVideos.push(newVideo);
-  
-  // Simulate status changes for demo purposes
-  simulateProcessing(newVideo);
-  
-  return newVideo;
-}
-
-// Simulate video processing status changes
-function simulateProcessing(video: Video) {
-  // Simulate starting processing after 3 seconds
-  setTimeout(() => {
-    video.status = 'processing';
-    console.log(`Video ${video.id} is now processing`);
+  try {
+    // Create a unique filename using timestamp and original name
+    const timestamp = new Date().getTime();
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${currentUser.id}/${timestamp}-${title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.${fileExt}`;
     
-    // Simulate completion after another 5-10 seconds
-    const completionTime = Math.floor(Math.random() * 5000) + 5000;
-    setTimeout(() => {
-      video.status = 'completed';
-      video.completedAt = new Date().toISOString();
-      video.driveUrl = `https://file-examples.com/storage/fe8c7eef0c6364f6c9504cc/2017/04/file_example_MP4_640_3MG.mp4`;
-      video.subtitlesUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
-      video.thumbnails = generateThumbnails();
-      console.log(`Video ${video.id} is now completed`);
-    }, completionTime);
-  }, 3000);
+    // Upload file to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('videos')
+      .upload(fileName, file);
+    
+    if (uploadError) throw uploadError;
+    
+    // Get the public URL for the uploaded file
+    const { data: { publicUrl: driveUrl } } = supabase.storage
+      .from('videos')
+      .getPublicUrl(fileName);
+    
+    // Create video record in the database
+    const { data: video, error: dbError } = await supabase
+      .from('videos')
+      .insert({
+        title,
+        original_filename: file.name,
+        processed_filename: fileName,
+        format: fileExt,
+        resolution: options.targetResolution,
+        size: file.size.toString(),
+        status: 'completed',
+        duration: '0', // Will be updated after processing
+        user_id: currentUser.id,
+        drive_link: driveUrl,
+        processing_options: options,
+        upload_date: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (dbError) throw dbError;
+    
+    // Generate thumbnail using the first frame
+    await generateThumbnail(video.id, driveUrl);
+    
+    // Generate subtitles if requested
+    if (options.generateSubtitles) {
+      await generateSubtitles(video.id, currentUser);
+    }
+    
+    return transformDatabaseVideo(video);
+  } catch (error) {
+    console.error('Error uploading video:', error);
+    throw error;
+  }
 }
 
 // Delete a video
 export async function deleteVideo(id: string, currentUser: User): Promise<boolean> {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  const videoIndex = mockVideos.findIndex(v => v.id === id);
-  
-  if (videoIndex === -1) return false;
-  
-  const video = mockVideos[videoIndex];
-  
-  // Check if user has permission to delete
-  if (currentUser.role !== 'admin' && video.ownerId !== currentUser.id) {
-    throw new Error('Unauthorized');
+  try {
+    const { data: video } = await supabase
+      .from('videos')
+      .select('processed_filename')
+      .eq('id', id)
+      .single();
+    
+    if (!video) return false;
+    
+    // Delete the file from storage
+    const { error: storageError } = await supabase.storage
+      .from('videos')
+      .remove([video.processed_filename]);
+    
+    if (storageError) throw storageError;
+    
+    // Delete the database record
+    const { error: dbError } = await supabase
+      .from('videos')
+      .delete()
+      .eq('id', id);
+    
+    if (dbError) throw dbError;
+    
+    return true;
+  } catch (error) {
+    console.error('Delete video error:', error);
+    throw error;
   }
-  
-  // Remove from mockVideos
-  mockVideos.splice(videoIndex, 1);
-  
-  return true;
 }
 
 // Generate subtitles for a video
 export async function generateSubtitles(id: string, currentUser: User): Promise<string | null> {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  const video = mockVideos.find(v => v.id === id);
-  
-  if (!video) return null;
-  
-  // Check if user has permission
-  if (currentUser.role !== 'admin' && video.ownerId !== currentUser.id) {
-    throw new Error('Unauthorized');
+  try {
+    // For now, just update the subtitles URL in the database
+    // In a real app, this would trigger a background job to generate subtitles
+    const subtitlesUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+    
+    const { error } = await supabase
+      .from('videos')
+      .update({ subtitles_url: subtitlesUrl })
+      .eq('id', id);
+    
+    if (error) throw error;
+    
+    return subtitlesUrl;
+  } catch (error) {
+    console.error('Generate subtitles error:', error);
+    throw error;
   }
-  
-  // Check if video is completed
-  if (video.status !== 'completed') {
-    throw new Error('Video must be processed before generating subtitles');
+}
+
+// Helper function to transform database video to our Video type
+function transformDatabaseVideo(dbVideo: any): Video {
+  return {
+    id: dbVideo.id,
+    title: dbVideo.title,
+    status: dbVideo.status as ProcessingStatus,
+    originalFormat: dbVideo.format as any,
+    targetFormat: dbVideo.format as any,
+    targetResolution: dbVideo.resolution as any,
+    createdAt: dbVideo.created_at || dbVideo.upload_date,
+    completedAt: dbVideo.processed_date,
+    size: parseInt(dbVideo.size),
+    duration: parseInt(dbVideo.duration),
+    thumbnailUrl: dbVideo.thumbnail || 'https://picsum.photos/seed/1/500/280',
+    driveUrl: dbVideo.drive_link,
+    ownerId: dbVideo.user_id,
+    subtitlesUrl: dbVideo.subtitles_url,
+    thumbnails: dbVideo.thumbnails || []
+  };
+}
+
+// Helper function to generate a thumbnail for a video
+async function generateThumbnail(videoId: string, videoUrl: string): Promise<void> {
+  try {
+    // For now, just use a placeholder thumbnail
+    // In a real app, this would generate actual thumbnails from the video
+    const thumbnailUrl = `https://picsum.photos/seed/${videoId}/500/280`;
+    
+    const { error } = await supabase
+      .from('videos')
+      .update({
+        thumbnail: thumbnailUrl,
+        thumbnails: [thumbnailUrl]
+      })
+      .eq('id', videoId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Generate thumbnail error:', error);
+    // Don't throw here as this is a background operation
+    toast.error('Failed to generate thumbnail');
   }
-  
-  // Mock subtitles URL
-  const subtitlesUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
-  video.subtitlesUrl = subtitlesUrl;
-  
-  return subtitlesUrl;
 }
