@@ -26,11 +26,13 @@ export type Video = {
   thumbnailUrl: string;
   driveUrl?: string;
   ownerId: string;
+  subtitlesUrl?: string; // URL to the subtitles file
+  thumbnails?: string[]; // Array of thumbnail URLs
 };
 
 export type ProcessingOptions = {
   targetFormat: VideoFormat;
   targetResolution: VideoResolution;
   compress: boolean;
+  generateSubtitles?: boolean;
 };
-

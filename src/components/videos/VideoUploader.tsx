@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,6 +20,7 @@ export function VideoUploader() {
     targetFormat: 'mp4',
     targetResolution: '720p',
     compress: true,
+    generateSubtitles: false,
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,7 +31,6 @@ export function VideoUploader() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       if (!title) {
-        // Set title based on filename without extension
         const fileName = e.target.files[0].name;
         const titleFromName = fileName.split('.').slice(0, -1).join('.');
         setTitle(titleFromName);
@@ -67,9 +66,9 @@ export function VideoUploader() {
     
     try {
       setIsUploading(true);
-      await uploadVideo(file, title, processingOptions, user);
+      const newVideo = await uploadVideo(file, title, processingOptions, user);
       toast.success('Video uploaded successfully');
-      navigate('/videos');
+      navigate(`/videos/${newVideo.id}`);
     } catch (error) {
       toast.error('Failed to upload video');
       console.error(error);
@@ -202,6 +201,18 @@ export function VideoUploader() {
                 }
               />
               <Label htmlFor="compress">Compress video</Label>
+            </div>
+            
+            {/* Generate Subtitles */}
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="subtitles" 
+                checked={processingOptions.generateSubtitles || false}
+                onCheckedChange={(checked) => 
+                  setProcessingOptions(prev => ({ ...prev, generateSubtitles: checked }))
+                }
+              />
+              <Label htmlFor="subtitles">Generate subtitles (may take longer)</Label>
             </div>
           </div>
           
