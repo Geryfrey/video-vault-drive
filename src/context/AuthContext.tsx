@@ -50,12 +50,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Set up auth state listener
   useEffect(() => {
+    // First set up the listener for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
+        console.log('Auth state changed:', event, currentSession?.user?.email);
         setSession(currentSession);
         
         if (currentSession?.user) {
-          // We use setTimeout to avoid potential deadlocks with Supabase client
+          // Use setTimeout to avoid potential deadlocks with Supabase client
           setTimeout(async () => {
             const transformedUser = await transformUser(currentSession.user);
             setUser(transformedUser);
@@ -68,13 +70,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // Check for existing session
+    // Then check for existing session
     const initializeAuth = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      setSession(currentSession);
+      console.log('Initializing auth');
+      const { data } = await supabase.auth.getSession();
+      console.log('Got session:', data.session?.user?.email);
       
-      if (currentSession?.user) {
-        const transformedUser = await transformUser(currentSession.user);
+      setSession(data.session);
+      
+      if (data.session?.user) {
+        const transformedUser = await transformUser(data.session.user);
         setUser(transformedUser);
       }
       
@@ -95,13 +100,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      if (data.user) {
-        const transformedUser = await transformUser(data.user);
-        setUser(transformedUser);
+      if (data?.user) {
         toast.success('Logged in successfully');
         navigate('/dashboard');
       }
     } catch (error: any) {
+      console.error('Login error:', error);
       toast.error(error.message || 'Login failed');
       throw error;
     } finally {
@@ -125,13 +129,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
       
       if (data.user) {
-        // The profile will be created automatically by the database trigger
-        const transformedUser = await transformUser(data.user);
-        setUser(transformedUser);
         toast.success('Account created successfully');
         navigate('/dashboard');
       }
     } catch (error: any) {
+      console.error('Registration error:', error);
       toast.error(error.message || 'Registration failed');
       throw error;
     } finally {
@@ -143,9 +145,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await supabase.auth.signOut();
       setUser(null);
+      setSession(null);
       toast.info('Logged out successfully');
       navigate('/login');
     } catch (error: any) {
+      console.error('Logout error:', error);
       toast.error(error.message || 'Logout failed');
     }
   };

@@ -24,13 +24,14 @@ export function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsSubmitting(true);
     
     try {
-      setIsSubmitting(true);
       await login(email, password);
-    } catch (error) {
-      console.error('Login error:', error);
-      // Error is already shown via toast
+      // Redirect is handled in the login function via useNavigate
+    } catch (error: any) {
+      console.error('Login error caught in form:', error);
+      setError(error.message || 'Login failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -62,6 +63,7 @@ export function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com" 
               required 
+              disabled={isSubmitting}
             />
           </div>
           <div className="space-y-2">
@@ -77,6 +79,7 @@ export function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required 
+              disabled={isSubmitting}
             />
           </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>

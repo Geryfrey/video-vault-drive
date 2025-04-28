@@ -22,7 +22,7 @@ export async function loginUser(email: string, password: string): Promise<User> 
     .from('profiles')
     .select('*')
     .eq('id', data.user.id)
-    .single();
+    .maybeSingle();
   
   if (profileError || !profile) {
     throw new Error('Profile not found');
